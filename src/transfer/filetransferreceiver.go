@@ -6,6 +6,7 @@ import (
 	"container/list"
 	"encoding/json"
 	"fmt"
+	"github.com/vbauerster/mpb/v8"
 	"net"
 	"os"
 )
@@ -14,6 +15,8 @@ type FileReceiver struct {
 	*FileTransferSession
 	transferQ   *list.List //接受队列 是*FileMetadata类型
 	writingFile *os.File   //正在写的文件
+	Process
+	bar *mpb.Bar
 }
 
 func NewFileReceiver(conn net.Conn) *FileReceiver {
@@ -35,6 +38,8 @@ func (r *FileReceiver) HandleRequest() {
 		// 第一次握手，响应本地公钥并将对方公钥设置到对象中
 		if r.State == HANDSHAKE1 {
 			err := r.Handshake1Process(reader)
+			// 响应本地公钥
+			_, err = r.Conn.Write(r.Crypto.LocalPublicKey())
 			if err != nil {
 				return
 			}
@@ -42,7 +47,10 @@ func (r *FileReceiver) HandleRequest() {
 		} else {
 			decrypt, err := r.ReadAndDecrypt(reader)
 			if err != nil {
-				fmt.Println("数据解密失败", err)
+				log.Error("数据解密失败", err)
+				if r.bar != nil && r.bar.IsRunning() {
+					r.bar.Abort(true)
+				}
 				return
 			}
 			r.processData(decrypt)
@@ -54,11 +62,11 @@ func (r *FileReceiver) HandleRequest() {
 
 func (r *FileReceiver) processData(data []byte) {
 	if r.State == HANDSHAKE2 {
-		fmt.Printf("第二次握手解密成功 %s \n", string(data))
+		log.Infof("第二次握手解密成功 %s \n", string(data))
 		shake2Packs := HandShake2Pack{}
 		err := json.Unmarshal(data, &shake2Packs)
 		if err != nil {
-			fmt.Println("文件元信息JSON解析失败")
+			log.Error("文件元信息JSON解析失败")
 			return
 		}
 		digest := r.Crypto.SessionKeyDigest()
@@ -69,9 +77,15 @@ func (r *FileReceiver) processData(data []byte) {
 		// 响应确认消息
 		_, err = r.EncryptAndSend([]byte("{\"response\":1}"))
 		if err != nil {
-			fmt.Println("文件元信息JSON解析失败")
+			log.Error("文件元信息JSON解析失败")
 			return
 		}
+		// 计算总大小并开始展示进度条
+		r.Process = Process{
+			Receive: true,
+			AllNum:  len(shake2Packs.Files),
+		}
+		_, r.bar = NewProcessBar(shake2Packs.TotalSize(), &r.Process)
 		r.State = TRANSFERRING
 		// 创建第一个文件
 		r.createNextFile()
@@ -86,13 +100,18 @@ func (r *FileReceiver) processData(data []byte) {
 			// 已经读了多少字节了
 			currFileMeta.Size -= writeSize
 			//写文件
-			_, err := r.writingFile.Write(data[:writeSize])
+			n, err := r.writingFile.Write(data[:writeSize])
 			if err != nil {
 				return
 			}
 			data = data[writeSize:]
-			if currFileMeta.Size == 0 { //当前文件传输完了
-				fmt.Println("传输完成-", currFileMeta)
+			// 写完了就更新进度条
+			r.bar.IncrInt64(int64(n))
+
+			if currFileMeta.Size <= 0 { //当前文件传输完了
+				log.Info("传输完成-", currFileMeta)
+				// 完成文件数量+1
+				r.Process.DoneNum++
 				// 出队一个元素
 				queue.Remove(queue.Front())
 				r.createNextFile()
@@ -117,6 +136,7 @@ func (r *FileReceiver) createNextFile() {
 			}
 		}
 		r.writingFile = file
+		r.Process.DoingFile = currMeta.FileName
 
 	}
 	if queue.Len() == 0 {
@@ -126,7 +146,7 @@ func (r *FileReceiver) createNextFile() {
 				return
 			}
 		}
-		fmt.Println("所有文件都传输完了")
+		log.Info("所有文件都传输完了")
 		r.State = FINISHED
 		err := conn.Close()
 		if err != nil {

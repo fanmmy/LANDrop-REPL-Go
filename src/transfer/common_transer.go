@@ -2,7 +2,7 @@ package transfer
 
 import (
 	"container/list"
-	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 )
 
@@ -20,6 +20,18 @@ const TransferPort = 7787
 
 // State 定义自定义类型作为枚举类型
 type State int
+
+var log = logrus.New()
+
+func init() {
+	file, err := os.OpenFile("transfer.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err == nil {
+		log.Out = file
+		log.SetReportCaller(true)
+	} else {
+		log.Info("Failed to log to file, using default stderr")
+	}
+}
 
 // 定义枚举值常量
 const (
@@ -55,36 +67,45 @@ func (p *HandShake2Pack) FileList() *list.List {
 	return l
 }
 
-// 返回值 metaQ ，fileQ
-func getFiles(fileList ...string) (*list.List, *list.List) {
+func (p *HandShake2Pack) TotalSize() int64 {
+	var totalSize int64 = 0
+	for _, meta := range p.Files {
+		totalSize += meta.Size
+	}
+	return totalSize
+}
+
+// 返回值 metaQ ，fileQ,totalSize
+func getFiles(fileList ...string) (*list.List, *list.List, int64) {
 
 	metaQ := list.New()
 	fileQ := list.New()
+	var totalSize int64 = 0
 	// 遍历文件列表
 	for _, filename := range fileList {
 		// 打开文件
 		file, err := os.Open(filename)
 		if err != nil {
-			fmt.Printf("Failed to open file %s: %s\n", filename, err)
+			log.Errorf("Failed to open file %s: %s\n", filename, err)
 			continue
 		}
 		// 获取文件信息
 		fileInfo, err := file.Stat()
 		if err != nil {
-			fmt.Printf("Failed to get file info for %s: %s\n", filename, err)
+			log.Errorf("Failed to get file info for %s: %s\n", filename, err)
 			continue
 		}
 
 		// 获取文件名称和大小
 		fileName := fileInfo.Name()
 		fileSize := fileInfo.Size()
-
+		totalSize += fileSize
 		metaQ.PushBack(&FileMetadata{fileName, fileSize})
 		fileQ.PushBack(file)
 		// 输出文件信息
-		fmt.Printf("File: %s, Size: %d bytes\n", fileName, fileSize)
+		//log.Infof("File: %s, Size: %d bytes\n", fileName, fileSize)
 	}
-	return metaQ, fileQ
+	return metaQ, fileQ, totalSize
 }
 
 // 链表转数组
@@ -98,9 +119,3 @@ func listToArray(l *list.List) []FileMetadata {
 
 	return arr
 }
-
-
-
-
-
-

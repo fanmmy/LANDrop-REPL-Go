@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/vbauerster/mpb/v8"
 	"io"
 	"net"
 	"os"
@@ -16,6 +17,8 @@ type FileSender struct {
 	*FileTransferSession
 	transferQ *list.List //传输文件的源信息队列
 	filesQ    *list.List //传输文件的原始句柄队列
+	Process
+	bar *mpb.Bar
 }
 
 func NewFileSender(conn net.Conn) *FileSender {
@@ -41,16 +44,22 @@ func (s *FileSender) handshake1Finished() {
 		DeviceName: runtime.GOOS,
 	}
 	marshal, err := json.Marshal(pack)
+	fmt.Println("第二次握手发送数据:", string(marshal))
 	if err != nil {
 		return
 	}
-	_, _ = s.EncryptAndSend(marshal)
+	_, err = s.EncryptAndSend(marshal)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 
 }
 
 func (s *FileSender) SendFiles(fileList ...string) {
 	// 启动一个会话，即开始第一次握手
-	s.transferQ, s.filesQ = getFiles(fileList...)
+	var totalSize int64
+	s.transferQ, s.filesQ, totalSize = getFiles(fileList...)
 	conn := s.Conn
 	s.StartSession()
 	reader := bufio.NewReader(conn)
@@ -62,15 +71,23 @@ func (s *FileSender) SendFiles(fileList ...string) {
 			}
 			// 第一次握手成功 发送JSON数据，开始第二次握手
 			s.handshake1Finished()
+			fmt.Println("第一次握手成功")
 
 		} else if s.State == HANDSHAKE2 {
 			decrypt, err := s.ReadAndDecrypt(reader)
 			if err != nil {
-				fmt.Println("第二次握手接收数据失败:", err)
+				//fmt.Println("第二次握手接收数据失败:", err)
 				return
 			}
+			//开始传输文件，初始化进度条
+			s.Process = Process{
+				Receive: false,
+				AllNum:  s.transferQ.Len(),
+			}
+			_, s.bar = NewProcessBar(totalSize, &s.Process)
 			err = s.processData(decrypt)
 			if err != nil {
+				log.Error(err)
 				return
 			}
 
@@ -84,7 +101,7 @@ func (s *FileSender) processData(data []byte) error {
 	if err != nil {
 		return errors.New("第二次握手接收端报文反序列化失败")
 	}
-	fmt.Println("第二次握手服务器响应:--", resp)
+	log.Info("第二次握手服务器响应:--", resp)
 	if !resp.IsAccept() {
 		s.State = FINISHED
 		err := s.Conn.Close()
@@ -98,10 +115,15 @@ func (s *FileSender) processData(data []byte) error {
 	for s.filesQ.Len() > 0 {
 		currFile := s.filesQ.Front().Value.(*os.File)
 		n, err := currFile.Read(fileQuantaBuffer)
+		//说明一下当前正在传输谁
+		s.Process.DoingFile = s.transferQ.Front().Value.(*FileMetadata).FileName
+		// 更新进度条
+		s.bar.IncrInt64(int64(n))
 		// 到达文件结尾，发送完毕
 		if err == io.EOF {
-			fmt.Println("发送完毕", s.transferQ.Front().Value.(*FileMetadata).FileName)
-			//发送完毕需要出队列
+			log.Info("发送完毕", s.transferQ.Front().Value.(*FileMetadata).FileName)
+			//发送完毕需要出队列并且更新进度信息
+			s.Process.DoneNum++
 			s.filesQ.Remove(s.filesQ.Front())
 			s.transferQ.Remove(s.transferQ.Front())
 			err := currFile.Close()
@@ -110,14 +132,15 @@ func (s *FileSender) processData(data []byte) error {
 			}
 			continue
 		}
-		_, err = s.EncryptAndSend(fileQuantaBuffer[:n])
+		n, err = s.EncryptAndSend(fileQuantaBuffer[:n])
 
 		if err != nil {
 			return err
 		}
 	}
 	if s.filesQ.Len() == 0 {
-		fmt.Println("所有文件都发送完毕")
+		log.Info("所有文件都发送完毕")
+		fmt.Println("完成")
 	}
 	return nil
 }

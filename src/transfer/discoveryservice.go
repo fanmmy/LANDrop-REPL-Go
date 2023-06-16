@@ -3,8 +3,6 @@ package transfer
 import (
 	"awesomeProject1/src/utils"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"runtime"
@@ -44,7 +42,7 @@ func (d *DiscoveryService) RefreshWithBroadcast() {
 		remoteAddr, _ := net.ResolveUDPAddr("udp", ip+":"+strconv.Itoa(DiscoveryPort))
 		_, err := d.conn.WriteToUDP([]byte("{\"request\":true}"), remoteAddr)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
 		}
 	}
 }
@@ -52,7 +50,7 @@ func (d *DiscoveryService) RefreshWithBroadcast() {
 func (d *DiscoveryService) RefreshSingle(remoteAddr *net.UDPAddr) {
 	_, err := d.conn.WriteToUDP([]byte("{\"request\":true}"), remoteAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 }
 
@@ -108,7 +106,6 @@ func (d *DiscoveryService) processConnection() {
 			})
 			continue
 		}
-		fmt.Printf("是请求，来自%v,读到的内容是:%v\n", udpAddr, req)
 
 		// 准备响应发现请求
 		jsonByte, _ := json.Marshal(localInfoPack())
@@ -118,8 +115,8 @@ func (d *DiscoveryService) processConnection() {
 }
 
 func handleDiscoveryResult(newHost *DiscoveryHost) {
-	fmt.Println("--发现主机，待处理展示--")
-	fmt.Println(newHost.DeviceName)
+	//log.Info("--发现主机，待处理展示--")
+	//log.Info(newHost.DeviceName)
 }
 
 // 生成本地数据包信息，用以响应UDP广播

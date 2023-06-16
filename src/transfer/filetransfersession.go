@@ -31,7 +31,7 @@ func (b *FileTransferSession) EncryptAndSend(data []byte) (int, error) {
 
 func (b *FileTransferSession) Handshake1Process(reader *bufio.Reader) error {
 	keySize := PublicKeySize
-	conn := b.Conn
+
 	buffer := make([]byte, keySize)
 	n, _ := reader.Read(buffer)
 	if n < keySize {
@@ -42,11 +42,7 @@ func (b *FileTransferSession) Handshake1Process(reader *bufio.Reader) error {
 	if err != nil {
 		return err
 	}
-	// 响应本地公钥
-	_, err = conn.Write(b.Crypto.LocalPublicKey())
-	if err != nil {
-		return err
-	}
+
 	// 设置当前状态为第二次握手
 	b.State = HANDSHAKE2
 	return nil
@@ -57,7 +53,7 @@ func (b *FileTransferSession) ReadAndDecrypt(reader *bufio.Reader) ([]byte, erro
 	crypto := b.Crypto
 	n, _ := reader.Read(sizeBuffer)
 	if n < 2 {
-		//fmt.Println("数据长度小于2，跳过")
+		log.Warn("数据长度小于2，跳过")
 		return nil, errors.New("数据长度小于2，验证失败")
 	}
 	// 解析消息体长度

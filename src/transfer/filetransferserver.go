@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"fmt"
-	"log"
 	"net"
 )
 
@@ -20,7 +19,7 @@ func StartFileTransferServer(port int) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("新连接:", conn.RemoteAddr())
+		//fmt.Println("新连接:", conn.RemoteAddr())
 		go NewFileReceiver(conn).HandleRequest()
 	}
 }
