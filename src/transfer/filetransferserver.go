@@ -1,12 +1,13 @@
 package transfer
 
 import (
+	"awesomeProject1/src/repl"
 	"fmt"
 	"net"
 )
 
 // StartFileTransferServer 启动文件接受服务
-func StartFileTransferServer(port int) error {
+func StartFileTransferServer(port int, receiveChan chan repl.Notify) error {
 	listener, err := net.Listen("tcp", ":"+fmt.Sprintf("%d", port))
 	if err != nil {
 		log.Fatal(err)
@@ -20,6 +21,6 @@ func StartFileTransferServer(port int) error {
 			log.Fatal(err)
 		}
 		//fmt.Println("新连接:", conn.RemoteAddr())
-		go NewFileReceiver(conn).HandleRequest()
+		go NewFileReceiver(conn, receiveChan).HandleRequest()
 	}
 }

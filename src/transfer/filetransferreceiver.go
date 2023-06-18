@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"awesomeProject1/src/repl"
 	"awesomeProject1/src/utils"
 	"bufio"
 	"container/list"
@@ -19,12 +20,13 @@ type FileReceiver struct {
 	bar *mpb.Bar
 }
 
-func NewFileReceiver(conn net.Conn) *FileReceiver {
+func NewFileReceiver(conn net.Conn, receiveChan chan repl.Notify) *FileReceiver {
 	crypto := &FileReceiver{
 		FileTransferSession: &FileTransferSession{
-			State:  HANDSHAKE1,
-			Crypto: NewCrypto(),
-			Conn:   conn,
+			State:      HANDSHAKE1,
+			Crypto:     NewCrypto(),
+			Conn:       conn,
+			NotifyChan: receiveChan,
 		},
 	}
 	return crypto
@@ -69,8 +71,19 @@ func (r *FileReceiver) processData(data []byte) {
 			log.Error("文件元信息JSON解析失败")
 			return
 		}
-		digest := r.Crypto.SessionKeyDigest()
-		fmt.Println("验证吗是", digest)
+
+		r.NotifyChan <- repl.Notify{NotifyType: repl.ReqAcceptFile, Msg: fmt.Sprintf("验证码：%s \n对方想要向你传输%d个文件，总大小为%d,是否接受？(y/n)", r.Crypto.SessionKeyDigest(), len(shake2Packs.Files), shake2Packs.TotalSize())}
+		accVal := <-r.NotifyChan
+		if accVal.Msg == "y" {
+
+			//r.NotifyChan <- Notify{NotifyType: Info, Msg: "您接受了对方的文件传输请求"}
+
+		} else {
+			//r.NotifyChan <- Notify{NotifyType: Info, Msg: "您拒绝了对方的文件传输请求"}
+			// 响应拒绝消息
+			_, err = r.EncryptAndSend([]byte("{\"response\":0}"))
+			return
+		}
 		// 将这些文件添加到transferQ俩面
 		r.transferQ = shake2Packs.FileList()
 

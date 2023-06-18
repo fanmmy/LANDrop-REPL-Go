@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"awesomeProject1/src/repl"
 	"awesomeProject1/src/utils"
 	"bufio"
 	"encoding/binary"
@@ -9,9 +10,11 @@ import (
 )
 
 type FileTransferSession struct {
-	State  State    //传输状态
-	Crypto *Crypto  //加密对象
-	Conn   net.Conn //网络连接
+	State      State            //传输状态
+	Crypto     *Crypto          //加密对象
+	Conn       net.Conn         //网络连接
+	NotifyChan chan repl.Notify //通信通道
+
 }
 
 // EncryptAndSend 加密并传输

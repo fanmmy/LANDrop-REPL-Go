@@ -54,7 +54,7 @@ func (d *DiscoveryService) RefreshSingle(remoteAddr *net.UDPAddr) {
 	}
 }
 
-func (d *DiscoveryService) StartDiscoveryServer(ready chan bool) {
+func (d *DiscoveryService) StartDiscoveryServer() {
 	// 解析得到UDP地址
 	addr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(d.port))
 	// 在UDP地址上建立UDP监听,得到连接
@@ -63,7 +63,8 @@ func (d *DiscoveryService) StartDiscoveryServer(ready chan bool) {
 		log.Fatal(err)
 		return
 	}
-	ready <- true
+	// 发送一次广播报文
+	go d.RefreshWithBroadcast()
 
 	d.processConnection()
 }
