@@ -44,7 +44,11 @@ func (s *FileSender) handshake1Finished() {
 		DeviceName: runtime.GOOS,
 	}
 	marshal, err := json.Marshal(pack)
-	fmt.Println("第二次握手发送数据:", string(marshal))
+	//fmt.Println("第二次握手发送数据:", string(marshal))
+	//<-s.NotifyChan
+	//s.NotifyChan <- Notify{NotifyType: Info, Msg: fmt.Sprintf("验证码为%s\n发送文件:%s", string(marshal))}
+	mainLineChan <- Notify{NotifyType: Info, Msg: fmt.Sprintf("验证码为:%s ,将发送以下文件:\n%s", s.Crypto.SessionKeyDigest(), pack.StringPrintFile())}
+
 	if err != nil {
 		return
 	}
@@ -56,28 +60,33 @@ func (s *FileSender) handshake1Finished() {
 
 }
 
-func (s *FileSender) SendFiles(fileList ...string) {
+func (s *FileSender) SendFiles(fileList ...string) error {
 	// 启动一个会话，即开始第一次握手
 	var totalSize int64
-	s.transferQ, s.filesQ, totalSize = getFiles(fileList...)
+	var err error
+	s.transferQ, s.filesQ, totalSize, err = getFiles(fileList...)
+	if err != nil {
+		return err
+	}
 	conn := s.Conn
 	s.StartSession()
 	reader := bufio.NewReader(conn)
 	for {
 		if s.State == HANDSHAKE1 {
-			err := s.Handshake1Process(reader)
+			err = s.Handshake1Process(reader)
 			if err != nil {
-				return
+				return err
 			}
 			// 第一次握手成功 发送JSON数据，开始第二次握手
 			s.handshake1Finished()
-			fmt.Println("第一次握手成功")
 
 		} else if s.State == HANDSHAKE2 {
 			decrypt, err := s.ReadAndDecrypt(reader)
 			if err != nil {
-				//fmt.Println("第二次握手接收数据失败:", err)
-				return
+				if err == io.EOF {
+					return nil
+				}
+				return err
 			}
 			//开始传输文件，初始化进度条
 			s.Process = Process{
@@ -88,11 +97,12 @@ func (s *FileSender) SendFiles(fileList ...string) {
 			err = s.processData(decrypt)
 			if err != nil {
 				log.Error(err)
-				return
+				return err
 			}
 
 		}
 	}
+
 }
 
 func (s *FileSender) processData(data []byte) error {
@@ -101,14 +111,15 @@ func (s *FileSender) processData(data []byte) error {
 	if err != nil {
 		return errors.New("第二次握手接收端报文反序列化失败")
 	}
-	log.Info("第二次握手服务器响应:--", resp)
+	log.Debug("第二次握手服务器响应:--", resp)
 	if !resp.IsAccept() {
 		s.State = FINISHED
+		s.bar.Abort(true)
 		err := s.Conn.Close()
 		if err != nil {
 			return err
 		}
-		return errors.New("文件接收端不接受文件列表")
+		return errors.New("对方拒绝了您的文件传输请求")
 	}
 	//  开始传输文件
 	fileQuantaBuffer := make([]byte, TransferQuanta)
@@ -139,8 +150,9 @@ func (s *FileSender) processData(data []byte) error {
 		}
 	}
 	if s.filesQ.Len() == 0 {
+		s.Conn.Close()
 		log.Info("所有文件都发送完毕")
-		fmt.Println("完成")
+		//mainLineChan <- Notify{NotifyType: Info, Msg: "所有文件都发送完毕"}
 	}
 	return nil
 }

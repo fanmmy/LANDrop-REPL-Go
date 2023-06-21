@@ -1,4 +1,4 @@
-package repl
+package transfer
 
 import (
 	"fmt"
@@ -33,11 +33,24 @@ func init() {
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
 	})
+	//rootCmd.AddCommand(rzCmd)
 }
 
 func tip(str string) {
 	l.Clean()
 	fmt.Println(str)
+	l.Refresh()
+}
+
+func tipWithPrompt(str, prompt string) {
+	l.Clean()
+	l.SetPrompt(fmt.Sprintf("\033[31m%s»\033[0m ", prompt))
+	fmt.Println(str)
+	l.Refresh()
+}
+
+func resetTipPrompt() {
+	l.SetPrompt("\033[31m»\033[0m ")
 	l.Refresh()
 }
 
@@ -53,18 +66,22 @@ func LoopRepl(notifyChan chan Notify) {
 		switch notify.NotifyType {
 		case ReqAcceptFile: // 接收文件请求
 			for {
-				l.SetPrompt("\033[31m>>>\033[0m ")
-				l.Refresh()
-				tip(notify.Msg)
 
+				tipWithPrompt(notify.Msg, "ack")
 				subPromptChan <- "yes"
 				confirmation := <-subPromptChan
 
 				if confirmation == "y" {
+					//l.Close()
 					notifyChan <- Notify{NotifyType: RespAcceptFile, Msg: "y"}
+					//l.Close()
+
+					//l.Refresh()
+
 					break
 				} else if confirmation == "n" {
 					notifyChan <- Notify{NotifyType: RespAcceptFile, Msg: "n"}
+					l.Refresh()
 					break
 				} else {
 					tip("非法输入. 请再试一次.")
@@ -74,57 +91,19 @@ func LoopRepl(notifyChan chan Notify) {
 			tip(notify.Msg)
 		case Prompt: // 交互式主菜单
 			line := notify.Msg
-			switch {
-			case strings.HasPrefix(line, "rz"):
-				switch strings.TrimSpace(line[2:]) {
-				case "vi":
-					l.SetVimMode(true)
-				case "emacs":
-					l.SetVimMode(false)
-				default:
-					println("invalid mode:", line[2:])
-				}
-			case line == "login":
-				for {
-					l.SetPrompt("\033[31m>>>\033[0m ")
-					l.Refresh()
-					tip("登录中，请稍后... (y/n)")
-					subPromptChan <- "yes"
-					confirmation := <-subPromptChan
-
-					if confirmation == "y" {
-						tip("login yes")
-						break
-					} else if confirmation == "n" {
-						tip("login no")
-						break
-					} else {
-						tip("非法输入. 请再试一次.")
-					}
-				}
-			case line == "help":
-				tipHelp()
-			case line == "?":
-				tipHelp()
-			case line == "exit":
-				tip("退出程序...")
-				return
-
-			default:
-				tip("非法输入. 请再试一次.(help/?)查看帮助")
-			}
+			mainMenu(line)
+			//return
 
 		}
-		l.SetPrompt("\033[31m»\033[0m ")
-		l.Refresh()
-
+		resetTipPrompt()
 	}
 }
+
 func tipHelp() {
 	tip(
 
-		"rz:      TODO 上传\n" +
-			"trz:     TODO 上传，通过GUI文件选择框\n" +
+		"sf:      DONE 上传文件\n" +
+			"sfd:     DONE 上传文件，GUI提示\n" +
 			"cfg:     TODO 配置\n" +
 			"info:    TODO 查看本机信息")
 }
@@ -137,6 +116,7 @@ func handleNotifyChan(notifyChan chan Notify) {
 
 func handleConsoleInput() {
 	for {
+		//TODO 这里在文件进度条期间不应该读取控制台输入，否则会截断进度条，如何实现？
 		l.Refresh()
 		line, _ := l.Readline()
 		line = strings.TrimSpace(line)

@@ -2,8 +2,10 @@ package transfer
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
+	"strings"
 )
 
 // 下载路径
@@ -59,6 +61,34 @@ type FileMetadata struct {
 	Size     int64  `json:"size"`
 }
 
+func (p *HandShake2Pack) StringPrintFile() string {
+	// 找到最长的 FileName 长度
+	maxLen := 0
+	for _, data := range p.Files {
+		if len(data.FileName) > maxLen {
+			maxLen = len(data.FileName) + 6
+		}
+	}
+	// 构建字符串缓冲区
+	var builder strings.Builder
+
+	// 输出表头
+	builder.WriteString("Filename")
+	builder.WriteString(strings.Repeat(" ", maxLen-8))
+	builder.WriteString("Size\n")
+
+	// 输出每个 FileMetadata
+	for _, data := range p.Files {
+		builder.WriteString(data.FileName)
+		builder.WriteString(strings.Repeat(" ", maxLen-len(data.FileName)))
+		builder.WriteString(fmt.Sprintf("%d\n", data.Size))
+	}
+
+	// 获取最终拼接好的字符串
+	return builder.String()
+
+}
+
 func (p *HandShake2Pack) FileList() *list.List {
 	l := list.New()
 	for i, _ := range p.Files {
@@ -76,7 +106,7 @@ func (p *HandShake2Pack) TotalSize() int64 {
 }
 
 // 返回值 metaQ ，fileQ,totalSize
-func getFiles(fileList ...string) (*list.List, *list.List, int64) {
+func getFiles(fileList ...string) (*list.List, *list.List, int64, error) {
 
 	metaQ := list.New()
 	fileQ := list.New()
@@ -87,13 +117,13 @@ func getFiles(fileList ...string) (*list.List, *list.List, int64) {
 		file, err := os.Open(filename)
 		if err != nil {
 			log.Errorf("Failed to open file %s: %s\n", filename, err)
-			continue
+			return nil, nil, 0, err
 		}
 		// 获取文件信息
 		fileInfo, err := file.Stat()
 		if err != nil {
 			log.Errorf("Failed to get file info for %s: %s\n", filename, err)
-			continue
+			return nil, nil, 0, err
 		}
 
 		// 获取文件名称和大小
@@ -105,7 +135,7 @@ func getFiles(fileList ...string) (*list.List, *list.List, int64) {
 		// 输出文件信息
 		//log.Infof("File: %s, Size: %d bytes\n", fileName, fileSize)
 	}
-	return metaQ, fileQ, totalSize
+	return metaQ, fileQ, totalSize, nil
 }
 
 // 链表转数组

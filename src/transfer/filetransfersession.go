@@ -1,19 +1,19 @@
 package transfer
 
 import (
-	"awesomeProject1/src/repl"
 	"awesomeProject1/src/utils"
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 )
 
 type FileTransferSession struct {
-	State      State            //传输状态
-	Crypto     *Crypto          //加密对象
-	Conn       net.Conn         //网络连接
-	NotifyChan chan repl.Notify //通信通道
+	State      State       //传输状态
+	Crypto     *Crypto     //加密对象
+	Conn       net.Conn    //网络连接
+	NotifyChan chan Notify //通信通道
 
 }
 
@@ -57,7 +57,7 @@ func (b *FileTransferSession) ReadAndDecrypt(reader *bufio.Reader) ([]byte, erro
 	n, _ := reader.Read(sizeBuffer)
 	if n < 2 {
 		log.Warn("数据长度小于2，跳过")
-		return nil, errors.New("数据长度小于2，验证失败")
+		return nil, io.EOF
 	}
 	// 解析消息体长度
 	size := binary.BigEndian.Uint16(sizeBuffer)

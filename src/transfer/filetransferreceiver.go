@@ -1,7 +1,6 @@
 package transfer
 
 import (
-	"awesomeProject1/src/repl"
 	"awesomeProject1/src/utils"
 	"bufio"
 	"container/list"
@@ -20,7 +19,7 @@ type FileReceiver struct {
 	bar *mpb.Bar
 }
 
-func NewFileReceiver(conn net.Conn, receiveChan chan repl.Notify) *FileReceiver {
+func NewFileReceiver(conn net.Conn, receiveChan chan Notify) *FileReceiver {
 	crypto := &FileReceiver{
 		FileTransferSession: &FileTransferSession{
 			State:      HANDSHAKE1,
@@ -72,14 +71,8 @@ func (r *FileReceiver) processData(data []byte) {
 			return
 		}
 
-		r.NotifyChan <- repl.Notify{NotifyType: repl.ReqAcceptFile, Msg: fmt.Sprintf("验证码：%s \n对方想要向你传输%d个文件，总大小为%d,是否接受？(y/n)", r.Crypto.SessionKeyDigest(), len(shake2Packs.Files), shake2Packs.TotalSize())}
-		accVal := <-r.NotifyChan
-		if accVal.Msg == "y" {
-
-			//r.NotifyChan <- Notify{NotifyType: Info, Msg: "您接受了对方的文件传输请求"}
-
-		} else {
-			//r.NotifyChan <- Notify{NotifyType: Info, Msg: "您拒绝了对方的文件传输请求"}
+		r.NotifyChan <- Notify{NotifyType: ReqAcceptFile, Msg: fmt.Sprintf("验证码：%s \n对方想要向你传输%d个文件，总大小为%d,是否接受？(y/n)", r.Crypto.SessionKeyDigest(), len(shake2Packs.Files), shake2Packs.TotalSize())}
+		if accVal := <-r.NotifyChan; accVal.Msg != "y" {
 			// 响应拒绝消息
 			_, err = r.EncryptAndSend([]byte("{\"response\":0}"))
 			return
