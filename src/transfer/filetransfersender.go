@@ -44,9 +44,6 @@ func (s *FileSender) handshake1Finished() {
 		DeviceName: runtime.GOOS,
 	}
 	marshal, err := json.Marshal(pack)
-	//fmt.Println("第二次握手发送数据:", string(marshal))
-	//<-s.NotifyChan
-	//s.NotifyChan <- Notify{NotifyType: Info, Msg: fmt.Sprintf("验证码为%s\n发送文件:%s", string(marshal))}
 	mainLineChan <- Notify{NotifyType: Info, Msg: fmt.Sprintf("验证码为:%s ,将发送以下文件:\n%s", s.Crypto.SessionKeyDigest(), pack.StringPrintFile())}
 
 	if err != nil {
@@ -64,7 +61,7 @@ func (s *FileSender) SendFiles(fileList ...string) error {
 	// 启动一个会话，即开始第一次握手
 	var totalSize int64
 	var err error
-	s.transferQ, s.filesQ, totalSize, err = getFiles(fileList...)
+	s.transferQ, s.filesQ, totalSize, err = getFiles(fileList)
 	if err != nil {
 		return err
 	}
@@ -151,8 +148,7 @@ func (s *FileSender) processData(data []byte) error {
 	}
 	if s.filesQ.Len() == 0 {
 		s.Conn.Close()
-		log.Info("所有文件都发送完毕")
-		//mainLineChan <- Notify{NotifyType: Info, Msg: "所有文件都发送完毕"}
+		log.Debug("所有文件都发送完毕")
 	}
 	return nil
 }

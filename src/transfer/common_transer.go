@@ -3,6 +3,7 @@ package transfer
 import (
 	"container/list"
 	"fmt"
+	"github.com/dustin/go-humanize"
 	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
@@ -81,7 +82,7 @@ func (p *HandShake2Pack) StringPrintFile() string {
 	for _, data := range p.Files {
 		builder.WriteString(data.FileName)
 		builder.WriteString(strings.Repeat(" ", maxLen-len(data.FileName)))
-		builder.WriteString(fmt.Sprintf("%d\n", data.Size))
+		builder.WriteString(fmt.Sprintf("%s\n", humanize.Bytes(uint64(data.Size))))
 	}
 
 	// 获取最终拼接好的字符串
@@ -106,7 +107,7 @@ func (p *HandShake2Pack) TotalSize() int64 {
 }
 
 // 返回值 metaQ ，fileQ,totalSize
-func getFiles(fileList ...string) (*list.List, *list.List, int64, error) {
+func getFiles(fileList []string) (*list.List, *list.List, int64, error) {
 
 	metaQ := list.New()
 	fileQ := list.New()
@@ -132,8 +133,7 @@ func getFiles(fileList ...string) (*list.List, *list.List, int64, error) {
 		totalSize += fileSize
 		metaQ.PushBack(&FileMetadata{fileName, fileSize})
 		fileQ.PushBack(file)
-		// 输出文件信息
-		//log.Infof("File: %s, Size: %d bytes\n", fileName, fileSize)
+
 	}
 	return metaQ, fileQ, totalSize, nil
 }

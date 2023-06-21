@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/chzyer/readline v1.5.1
+	github.com/dustin/go-humanize v1.0.1
 	github.com/ncruces/zenity v0.10.9
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.2.1

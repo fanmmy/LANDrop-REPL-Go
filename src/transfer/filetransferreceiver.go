@@ -6,6 +6,7 @@ import (
 	"container/list"
 	"encoding/json"
 	"fmt"
+	"github.com/dustin/go-humanize"
 	"github.com/vbauerster/mpb/v8"
 	"net"
 	"os"
@@ -71,7 +72,7 @@ func (r *FileReceiver) processData(data []byte) {
 			return
 		}
 
-		r.NotifyChan <- Notify{NotifyType: ReqAcceptFile, Msg: fmt.Sprintf("验证码：%s \n对方想要向你传输%d个文件，总大小为%d,是否接受？(y/n)", r.Crypto.SessionKeyDigest(), len(shake2Packs.Files), shake2Packs.TotalSize())}
+		r.NotifyChan <- Notify{NotifyType: ReqAcceptFile, Msg: fmt.Sprintf("验证码：%s \n对方想要向你传输%d个文件，总大小为%s,是否接受？(y/n)", r.Crypto.SessionKeyDigest(), len(shake2Packs.Files), humanize.Bytes(uint64(shake2Packs.TotalSize())))}
 		if accVal := <-r.NotifyChan; accVal.Msg != "y" {
 			// 响应拒绝消息
 			_, err = r.EncryptAndSend([]byte("{\"response\":0}"))

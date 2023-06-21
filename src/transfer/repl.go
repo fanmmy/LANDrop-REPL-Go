@@ -18,7 +18,6 @@ const (
 	RespAcceptFile                   // 响应是否接收文件
 	Info                             // 信息通知
 	Prompt                           // 输入提示
-	ProcessBarDone                   // 进度条完成
 )
 
 var l *readline.Instance
@@ -66,18 +65,12 @@ func LoopRepl(notifyChan chan Notify) {
 		switch notify.NotifyType {
 		case ReqAcceptFile: // 接收文件请求
 			for {
-
 				tipWithPrompt(notify.Msg, "ack")
 				subPromptChan <- "yes"
 				confirmation := <-subPromptChan
 
 				if confirmation == "y" {
-					//l.Close()
 					notifyChan <- Notify{NotifyType: RespAcceptFile, Msg: "y"}
-					//l.Close()
-
-					//l.Refresh()
-
 					break
 				} else if confirmation == "n" {
 					notifyChan <- Notify{NotifyType: RespAcceptFile, Msg: "n"}
@@ -92,7 +85,6 @@ func LoopRepl(notifyChan chan Notify) {
 		case Prompt: // 交互式主菜单
 			line := notify.Msg
 			mainMenu(line)
-			//return
 
 		}
 		resetTipPrompt()
@@ -116,7 +108,6 @@ func handleNotifyChan(notifyChan chan Notify) {
 
 func handleConsoleInput() {
 	for {
-		//TODO 这里在文件进度条期间不应该读取控制台输入，否则会截断进度条，如何实现？
 		l.Refresh()
 		line, _ := l.Readline()
 		line = strings.TrimSpace(line)

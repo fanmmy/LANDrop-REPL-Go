@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-// return 是否退出程序
-// TODO 这里每次都初始化一次命令，是因为flag参数不传时会默认取上一次的值
 var cmdMap = initCmdMap()
 
 // 返回值是否退出
@@ -25,7 +23,6 @@ func mainMenu(line string) {
 	switch command {
 	case "sfd":
 		sfdCmd := cmdMap["sfd"]
-
 		sfdCmd.SetArgs(subArgs[:])
 		if err := sfdCmd.Execute(); err != nil {
 			tip(err.Error())
@@ -57,7 +54,7 @@ func mainMenu(line string) {
 			}
 
 			args := make([]string, 0)
-			args = append(args, strings.Join(multiple, " "))
+			args = append(args, multiple...)
 			args = append(args, "--host")
 			args = append(args, addr.IP.String())
 			args = append(args, "--port")
@@ -95,13 +92,13 @@ func initCmdMap() map[string]*cobra.Command {
 		Use:   "sf",
 		Short: "Send files step by step",
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  handleRz,
+		RunE:  handleSf,
 	}
 	var sfdCmd = &cobra.Command{
 		Use:   "sfd",
 		Short: "Send files with directory",
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  handleRz,
+		RunE:  handleSf,
 	}
 	var rootCmd = &cobra.Command{
 		Use:   "repl",
@@ -125,7 +122,7 @@ func initCmdMap() map[string]*cobra.Command {
 	return commands
 }
 
-func handleRz(cmd *cobra.Command, args []string) error {
+func handleSf(cmd *cobra.Command, args []string) error {
 
 	ip, err := cmd.Flags().GetString("host")
 
@@ -138,12 +135,12 @@ func handleRz(cmd *cobra.Command, args []string) error {
 
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
-		fmt.Println("连接服务器失败:", err)
+		//fmt.Println("连接服务器失败:", err)
 		return err
 	}
 	//defer conn.Close()
 	go func() {
-		err := NewFileSender(conn).SendFiles(args[0])
+		err := NewFileSender(conn).SendFiles(args[:]...)
 		if err != nil {
 			tip(err.Error())
 		}
