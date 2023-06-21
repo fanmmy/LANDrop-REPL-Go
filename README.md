@@ -25,17 +25,17 @@
 
 接收目录目前硬编码在`src/transfer/common_transer.go`中的`downloadDir`全局变量，后续将支持命令行传参和配置文件配置。
 
-![等待接收文件](/Users/fmy/coding/Golang/LANDrop-Core-Go/doc/imgs/receive.gif)
+![等待接收文件](https://github.com/fanmmy/LANDrop-Core-Go/blob/main/doc/imgs/receive.gif?raw=true)
 ### 主动发送文件
 
 #### sfd命令（Send files with directory）
 
-![等待接收文件](/Users/fmy/coding/Golang/LANDrop-Core-Go/doc/imgs/sfd.png)
+![等待接收文件](https://github.com/fanmmy/LANDrop-Core-Go/blob/main/doc/imgs/sfd.png?raw=true)
 
 #### sf命令（GUI文件选择框）
 
-<video id="video" controls="" preload="none" poster="作者(图片地址)">
-<source id="mp4" src="视频地址" type="video/mp4">
+<video id="video" controls="" preload="none"  >
+<source id="mp4" src="https://github.com/fanmmy/LANDrop-Core-Go/blob/main/doc/mp4/sfsending.mp4?raw=true" type="video/mp4">
 </video>
 
 
